@@ -1100,6 +1100,64 @@ class DecisionSignalFeedbackRecord(Base):
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
 
 
+class ReversePick(Base):
+    """
+    反向分析 - 第三方选股记录
+
+    存储第三方选股系统每日选出的股票及次日表现，用于策略训练和对比验证。
+    """
+    __tablename__ = 'reverse_picks'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # 选股日期 (YYYYMMDD)
+    pick_date = Column(String(8), nullable=False, index=True)
+
+    # 股票代码（6位数字）
+    stock_code = Column(String(6), nullable=False, index=True)
+
+    # 股票名称
+    stock_name = Column(String(32), default="")
+
+    # 选中时价格（尾盘价）
+    pick_price = Column(Float, nullable=True)
+
+    # 前一日收盘价
+    prev_close = Column(Float, nullable=True)
+
+    # 甄选当日涨跌幅(%)
+    pick_day_change = Column(Float, nullable=True)
+
+    # 隔日涨跌幅(%) - 次日开盘到收盘
+    next_day_change = Column(Float, nullable=True)
+
+    # 是否成功（1=盈利, 0=亏损）
+    success = Column(Integer, default=1)
+
+    # 记录创建时间
+    created_at = Column(DateTime, default=utc_naive_now)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now)
+
+    __table_args__ = (
+        UniqueConstraint('pick_date', 'stock_code', name='uix_reverse_pick_date_code'),
+        Index('ix_reverse_pick_date', 'pick_date'),
+        Index('ix_reverse_stock_code', 'stock_code'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'pick_date': self.pick_date,
+            'stock_code': self.stock_code,
+            'stock_name': self.stock_name or '',
+            'pick_price': self.pick_price,
+            'prev_close': self.prev_close,
+            'pick_day_change': self.pick_day_change,
+            'next_day_change': self.next_day_change,
+            'success': self.success,
+        }
+
+
 class _DatabaseManagerMeta(type):
     """Serialize DatabaseManager construction across __new__ and __init__."""
 

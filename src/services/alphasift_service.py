@@ -830,6 +830,20 @@ class AlphaSiftService:
         _ensure_alphasift_enabled(self.config)
         _ensure_alphasift_available_for_use()
         strategies = _list_strategies()
+
+        # 注入 DSA 内置的"反向分析选股"策略
+        reverse_strategy = {
+            "id": self.REVERSE_STRATEGY_ID,
+            "name": "反向分析选股",
+            "title": "反向分析选股",
+            "description": "基于高胜率第三方选股系统历史数据的逆向分析策略。核心逻辑：选中趋势强度适中、价格贴近均线的低位反转股，适合尾盘买入隔日卖出。",
+            "category": "pattern",
+            "tag": "短线",
+            "tags": ["短线", "隔日", "反转"],
+            "market_scope": ["cn"],
+        }
+        strategies.append(reverse_strategy)
+
         return {
             "enabled": True,
             "strategies": strategies,
@@ -1065,7 +1079,14 @@ class AlphaSiftService:
         _write_alphasift_hotspot_detail_cache(provider=provider_name, topic=topic_text, payload=cleaned)
         return cleaned
 
+    REVERSE_STRATEGY_ID = "reverse_engineered"
+    """反向分析选股策略 ID，该策略由 DSA 内部实现，不依赖 AlphaSift 适配层。"""
+
     def screen(self, *, strategy: str, market: str, max_results: int) -> Dict[str, Any]:
+        # 反向分析选股策略：由 DSA 内部引擎处理，不走 AlphaSift 适配层
+        if strategy == self.REVERSE_STRATEGY_ID:
+            return self._screen_reverse(market=market, max_results=max_results)
+
         _ensure_alphasift_enabled(self.config)
         _ensure_alphasift_available_for_use()
         _ensure_supported_market(market)
@@ -1128,6 +1149,29 @@ class AlphaSiftService:
             "portfolio_diversity_enabled": raw_data.get("portfolio_diversity_enabled"),
             "portfolio_concentration_notes": raw_data.get("portfolio_concentration_notes") or [],
         }
+
+    def _screen_reverse(self, *, market: str, max_results: int) -> Dict[str, Any]:
+        """反向分析选股：使用 DSA 内部引擎扫描全市场，不依赖 AlphaSift 适配层。"""
+        import os as _os
+        import subprocess
+        import sys as _sys
+        script = Path(__file__).resolve().parent.parent.parent / "scripts" / "screen_reverse.py"
+        project_root = Path(__file__).resolve().parent.parent.parent
+        env = _os.environ.copy()
+        env["PYTHONPATH"] = f"{project_root}:{env.get('PYTHONPATH', '')}"
+        result = subprocess.run(
+            [_sys.executable, str(script), "--top", str(max_results), "--market", market, "--json"],
+            capture_output=True, text=True, timeout=300, env=env,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"反向分析选股失败: {result.stderr.strip() or '未知错误'}")
+        try:
+            data = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            raise RuntimeError(f"反向分析选股输出异常: {result.stdout[:200]}")
+        data["strategy"] = self.REVERSE_STRATEGY_ID
+        data["enabled"] = True
+        return data
 
 
 def _normalize_alphasift_hotspot_detail(detail: Any, *, provider: str, requested_topic: str) -> Dict[str, Any]:

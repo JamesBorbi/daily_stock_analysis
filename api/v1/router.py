@@ -23,6 +23,7 @@ from api.v1.endpoints import (
     history,
     intelligence,
     portfolio,
+    reverse_training,
     stocks,
     system_config,
     usage,
@@ -113,4 +114,10 @@ router.include_router(
 router.include_router(
     health.router,
     tags=["Health"]
+)
+
+router.include_router(
+    reverse_training.router,
+    prefix="/reverse-training",
+    tags=["ReverseTraining"]
 )
