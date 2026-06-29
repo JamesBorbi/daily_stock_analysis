@@ -57,6 +57,7 @@ env/
 /.llm_usage_hmac_secret
 **/.llm_usage_hmac_secret
 logs/
+/log_*.txt
 reports/
 *.db
 *.sqlite

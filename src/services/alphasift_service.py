@@ -1834,7 +1834,10 @@ def _alphasift_dsa_daily_history_provider() -> Iterator[None]:
                 source,
                 exc,
             )
-        return original_fetch(code, lookback_days=lookback_days, source=source, retries=retries)
+        # Fall back with "auto" so AlphaSift tries tencent→akshare→baostock
+        # instead of only the single source that was passed in (default "akshare").
+        fallback_source = os.getenv("ALPHASIFT_DAILY_HISTORY_SOURCE", "auto")
+        return original_fetch(code, lookback_days=lookback_days, source=fallback_source, retries=retries)
 
     with _ALPHASIFT_RUNTIME_ENV_LOCK:
         setattr(daily_module, "fetch_daily_history", fetch_daily_history_with_dsa)
